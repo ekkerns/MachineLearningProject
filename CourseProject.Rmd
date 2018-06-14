@@ -1,0 +1,58 @@
+---
+title: "RegressionModelsCourseProject_ElKerns"
+author: "Ellen Kerns"
+date: "May 7, 2018"
+output: pdf_document
+---
+
+#Clasifying Weightlifting Technique Using Accelerometer Data
+
+##Executive Summary:
+This analysis aimed to build a model that predicts the quality of the weightlifting technique used by participants wearing devices that record accelerometer data. The data were loaded from this project " http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har" which had 6 particpants perform  Unilateral Dumbbell Biceps Curs in 5 different fashions with only one being correct and the other4 representing common mistakes. After features unsuitable for predcition were removed (timestamps, id, etc), the test data were split into a testing and training set in order to take adavantage of cross validation. Random forest and decision tree models were trained on the training set and tested on the train based test set. Due to it's higher accuracy (99% versus 52%), the random forest model was chosen.
+##Preparing the Datasets:
+```{r EDA, results="hide", fig.show='hide'}
+#download and import dataset
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","train.csv")
+train<-read.csv("train.csv")
+
+#Remove variables that are not relevant to the analysis
+train<-train[, -c(1:5)] 
+
+#Remove variables with 90+% missing values
+mostlyNA <- sapply(train, function(x) mean(is.na(x))) > 0.95
+train<-train[,mostlyNA == F]
+
+# remove variables with nearly zero variance -> poor predictors
+library(caret)
+nzv <- nearZeroVar(train)
+train <- train[, -nzv]
+
+#make outcome a factor variable
+train$classe<-as.factor(train$classe)
+
+#Partition into test and train for cross validation
+inTrain <- createDataPartition(y=train$classe,
+                               p=0.75, list=FALSE)#75% train
+trainTrain <- train[inTrain,]
+testTrain <- train[-inTrain,]
+```
+
+##Model Creation
+```{r Model Creation, cache = TRUE}
+
+#3-fold cross validation
+fitControl <- trainControl(method="cv", number=3, verboseIter=F)
+
+#Random Forest
+m1 <- train(y = trainTrain$classe, method="rf", x = trainTrain[,-54],
+                    trControl=fitControl)
+#Decision Tree
+m2 <- train(y = trainTrain$classe, method="rpart", x = trainTrain[,-54],
+                    trControl=fitControl)
+```
+
+#Model Comparison
+```{r Model Comaprison}
+        confusionMatrix(testTrain$classe,predict(m1,testTrain))
+        confusionMatrix(testTrain$classe,predict(m2,testTrain))
+```
